@@ -1,246 +1,313 @@
 import { useMemo, useState } from "react";
 import {
-  ArrowRight,
+  ArrowDownRight,
+  Building2,
   CalendarDays,
+  ChartNoAxesCombined,
+  Check,
   Download,
+  FileWarning,
+  Plus,
   ReceiptText,
-  TrendingUp,
+  Sparkles,
+  UserRound,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { downloadExpensesCsv, formatRupees } from "../data/expenses";
-import { useExpenses } from "../store";
 import {
-  MetricCard,
-  PageHeading,
-  StatusBadge,
-  useGlobalExpenseSearch,
-} from "../components/Shared";
+  createDemoExpenses,
+  downloadExpensesCsv,
+  formatDate,
+  formatRupees,
+} from "../data/expenses";
+import { useExpenses } from "../store";
+import { StatusBadge, useGlobalExpenseSearch } from "../components/Shared";
 import type { Expense } from "../types";
 
+type GroupTotal = { name: string; type: string; amount: number; count: number };
+
+function groupExpenses(
+  expenses: Expense[],
+  key: "paidFor" | "paidForType" | "category",
+) {
+  const groups = new Map<string, GroupTotal>();
+  expenses.forEach((expense) => {
+    const name = expense[key] || "Other";
+    const current = groups.get(name) ?? {
+      name,
+      type: key === "paidForType" ? name : expense.paidForType,
+      amount: 0,
+      count: 0,
+    };
+    current.amount += expense.amount;
+    current.count += 1;
+    groups.set(name, current);
+  });
+  return [...groups.values()];
+}
+
 export function Dashboard() {
-  const { expenses } = useExpenses();
+  const { expenses, replaceExpenses } = useExpenses();
   const navigate = useNavigate();
+  const [demoLoaded, setDemoLoaded] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    return "2026-07";
+  });
   const [period, setPeriod] = useState<"Weekly" | "Daily">("Weekly");
+  const [leaderboard, setLeaderboard] = useState<"amount" | "frequency">(
+    "amount",
+  );
   const [localSearch, setLocalSearch] = useState("");
   const search = useGlobalExpenseSearch() || localSearch;
+  const monthlyExpenses = useMemo(
+    () => expenses.filter((item) => item.date.startsWith(selectedMonth)),
+    [expenses, selectedMonth],
+  );
   const filtered = useMemo(
     () =>
-      expenses.filter((item) =>
-        `${item.vendor} ${item.purpose} ${item.category}`
+      monthlyExpenses.filter((item) =>
+        `${item.id} ${item.vendor} ${item.purpose} ${item.category} ${item.paidFor}`
           .toLowerCase()
           .includes(search.toLowerCase()),
       ),
-    [expenses, search],
+    [monthlyExpenses, search],
   );
-  const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const recent = filtered.slice(0, 5);
+  const total = monthlyExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const average = monthlyExpenses.length ? Math.round(total / monthlyExpenses.length) : 0;
+  const clients = new Set(monthlyExpenses.filter((expense) => expense.paidForType === "Client").map((expense) => expense.paidFor)).size;
+  const employees = new Set(monthlyExpenses.filter((expense) => expense.paidForType === "Employee").map((expense) => expense.paidFor)).size;
+  const entities = clients;
+  const attached = monthlyExpenses.filter((expense) => expense.receipt).length;
+  const missing = monthlyExpenses.length - attached;
+  const pending = monthlyExpenses.filter((expense) => expense.status === "Pending").length;
+  const selectedDate = new Date(`${selectedMonth}-01T00:00:00`);
+  const monthName = selectedDate.toLocaleDateString("en-US", { month: "long" });
+  const year = selectedDate.getFullYear();
+  const highestByWho = groupExpenses(filtered, "paidFor").sort((a, b) =>
+    leaderboard === "amount" ? b.amount - a.amount : b.count - a.count,
+  );
+  const byWho = groupExpenses(monthlyExpenses, "paidForType").sort(
+    (a, b) => b.amount - a.amount,
+  );
+  const byCategory = groupExpenses(monthlyExpenses, "category").sort(
+    (a, b) => b.amount - a.amount,
+  );
+  const recent = [...filtered].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  const chartValues = [12, 18, 25, 29.5];
 
   return (
-    <>
-      <PageHeading
-        title="Expense Dashboard"
-        description="A clear view of DesFlyer's spending this month."
-        action={
-          <button className="button button-outline">
-            <CalendarDays size={15} />
-            July 2026
-          </button>
-        }
-      />
-      <div className="metric-grid">
-        <MetricCard
-          label="Total Expenses"
-          value={formatRupees(total)}
-          note="This month"
-        />
-        <MetricCard
-          label="Expense Entries"
-          value={String(expenses.length)}
-          note="Recorded this month"
-          tone="green"
-        />
-        <MetricCard
-          label="Pending Review"
-          value={String(
-            expenses.filter((item) => item.status === "Pending").length,
-          )}
-          note="Waiting for approval"
-          tone="orange"
-        />
-        <MetricCard
-          label="Missing Receipts"
-          value={String(expenses.filter((item) => !item.receipt).length)}
-          note="Follow up required"
-        />
-      </div>
-      <section className="panel trend-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Spending Trend</h2>
-            <p>Weekly expenditure overview</p>
-          </div>
-          <div className="segmented">
-            <button
-              className={period === "Weekly" ? "selected" : ""}
-              onClick={() => setPeriod("Weekly")}
-            >
-              Weekly
-            </button>
-            <button
-              className={period === "Daily" ? "selected" : ""}
-              onClick={() => setPeriod("Daily")}
-            >
-              Daily
-            </button>
-          </div>
+    <div className="figma-dashboard">
+      <header className="dashboard-heading">
+        <div>
+          <h1>Expense Dashboard</h1>
+          <p>A clear view of Desflyer&apos;s spending this month.</p>
         </div>
-        <div className="chart-area">
-          <div className="chart-y-labels">
-            <span>₹30k</span>
-            <span>₹20k</span>
-            <span>₹10k</span>
-            <span>₹0</span>
-          </div>
-          <svg
-            className="trend-chart"
-            viewBox="0 0 1000 190"
-            role="img"
-            aria-label={`${period} expenses chart`}
-          >
-            <defs>
-              <linearGradient id="fill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0" stopColor="#1677ff" stopOpacity=".16" />
-                <stop offset="1" stopColor="#1677ff" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0 35H1000 M0 85H1000 M0 135H1000 M0 185H1000"
-              stroke="#edf0f4"
-              strokeDasharray="4 5"
+        <div className="dashboard-heading-actions">
+          <label className="dashboard-date">
+            <CalendarDays size={18} />
+            {monthName} {year}
+            <span className="chevron-down" />
+            <input
+              type="month"
+              aria-label="Select dashboard month"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
             />
-            <path
-              d="M20 132 C120 118 145 110 240 102 S350 86 450 98 S580 65 680 74 S790 30 980 18 V185 H20Z"
-              fill="url(#fill)"
-            />
-            <path
-              d="M20 132 C120 118 145 110 240 102 S350 86 450 98 S580 65 680 74 S790 30 980 18"
-              fill="none"
-              stroke="#1677ff"
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
-            <circle
-              cx="980"
-              cy="18"
-              r="5"
-              fill="#fff"
-              stroke="#1677ff"
-              strokeWidth="3"
-            />
-          </svg>
+          </label>
         </div>
-        <div className="chart-labels">
-          <span>Week 1</span>
-          <span>Week 2</span>
-          <span>Week 3</span>
-          <span>Week 4</span>
-        </div>
-      </section>
-      <div className="dashboard-lower">
-        <section className="panel highest-panel">
-          <div className="panel-heading">
+      </header>
+
+      <div className="dashboard-canvas">
+        <section className="dashboard-kpis" aria-label="Monthly expense summary">
+          <article className="dashboard-kpi">
+            <span className="kpi-label">TOTAL SPENT</span>
+            <strong>{formatRupees(total)}</strong>
+            <span className="kpi-foot kpi-positive">
+              {monthlyExpenses.length ? <><ArrowDownRight size={14} />+12% from last month</> : "No expenses yet"}
+            </span>
+          </article>
+          <article className="dashboard-kpi">
+            <span className="kpi-label">AVERAGE EXPENSE</span>
+            <strong>{formatRupees(average)}</strong>
+            <span className="kpi-foot">Per transaction</span>
+          </article>
+          <article className="dashboard-kpi">
+            <span className="kpi-label">EXPENSE ENTRIES</span>
+            <strong>{monthlyExpenses.length}</strong>
+            <span className="kpi-foot">This month</span>
+          </article>
+          <article className="dashboard-kpi">
+            <span className="kpi-label">PEOPLE / CLIENTS</span>
+            <strong>{entities}</strong>
+            <span className="kpi-foot">Active entities</span>
+          </article>
+        </section>
+
+        <section className="dashboard-chart panel">
+          <div className="dashboard-panel-heading">
             <div>
-              <h2>Highest Spending</h2>
-              <p>Largest expenses this month</p>
+              <h2>Spending Trend</h2>
+              <p>Weekly expenditure overview</p>
             </div>
-            <Link to="/expenses" className="text-link">
-              View all <ArrowRight size={14} />
-            </Link>
-          </div>
-          <div className="high-list">
-            {[...filtered]
-              .sort((a, b) => b.amount - a.amount)
-              .slice(0, 4)
-              .map((expense) => (
+            <div className="dashboard-period" aria-label="Chart period">
+              {(["Weekly", "Daily"] as const).map((item) => (
                 <button
-                  className="high-row"
-                  key={expense.id}
-                  onClick={() => navigate(`/expenses/${expense.id}`)}
+                  key={item}
+                  className={period === item ? "selected" : ""}
+                  onClick={() => setPeriod(item)}
                 >
-                  <span className="category-icon">
-                    <ReceiptText size={18} />
-                  </span>
-                  <span className="high-detail">
-                    <strong>{expense.vendor}</strong>
-                    <small>
-                      {expense.category} · {expense.paidForType}
-                    </small>
-                  </span>
-                  <strong className="high-amount">
-                    {formatRupees(expense.amount)}
-                  </strong>
+                  {item}
                 </button>
               ))}
-          </div>
-        </section>
-        <section className="panel recent-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Recent Expenses</h2>
-              <p>Latest activity across the team</p>
             </div>
-            <button
-              className="icon-button"
-              title="Download report"
-              onClick={() => downloadExpensesCsv(expenses)}
-            >
-              <Download size={17} />
-            </button>
           </div>
-          <div className="dashboard-search">
-            <input
-              placeholder="Filter this list..."
-              value={localSearch}
-              onChange={(event) => setLocalSearch(event.target.value)}
-            />
-          </div>
-          <div className="recent-list">
-            {recent.map((expense: Expense) => (
-              <button
-                className="recent-row"
-                key={expense.id}
-                onClick={() => navigate(`/expenses/${expense.id}`)}
-              >
-                <span className="recent-dot" />
-                <span className="recent-detail">
-                  <strong>{expense.purpose}</strong>
-                  <small>{expense.vendor}</small>
-                </span>
-                <span className="recent-right">
-                  <strong>{formatRupees(expense.amount)}</strong>
-                  <StatusBadge status={expense.status} />
-                </span>
-              </button>
-            ))}
+          <div className={`dashboard-plot dashboard-line-plot ${monthlyExpenses.length ? "has-trend-data" : ""}`}>
+            {monthlyExpenses.length ? <>
+              <svg viewBox="0 0 1000 190" preserveAspectRatio="none" role="img" aria-label="Weekly spending trend">
+                <polyline className="trend-previous" points="112,133 350,99 578,68 756,43" />
+                <polyline className="trend-current" points="14,164 248,124 470,83 686,63 904,44" />
+              </svg>
+              <div className="trend-value-labels"><span>₹12k</span><span>₹18k</span><span>₹25k</span><span>₹29.5k</span></div>
+              <span className="trend-highest">HIGHEST</span>
+              <div className="trend-week-labels">{chartValues.map((value, index) => <span key={value} className={index === 3 ? "current-week" : ""}>{period === "Weekly" ? `Week ${index + 1}` : `${index * 7 + 1} ${monthName.slice(0, 3)}`}</span>)}</div>
+            </> : <div className="plot-empty">Add expenses to see spending trends here.</div>}
           </div>
         </section>
-      </div>
-      <section className="monthly-summary">
-        <div>
-          <span>JULY 2026 SUMMARY</span>
-          <strong>
-            {formatRupees(total)} <i>•</i> {expenses.length} Entries <i>•</i>{" "}
-            {expenses.filter((item) => !item.receipt).length} Missing Bills
-          </strong>
+
+        <div className="dashboard-middle-grid">
+          <section className="dashboard-highest panel">
+            <div className="dashboard-panel-heading dashboard-high-heading">
+              <div>
+                <h2>Highest Spending</h2>
+                <div className="dashboard-sort-tabs">
+                  <button className={leaderboard === "amount" ? "selected" : ""} onClick={() => setLeaderboard("amount")}>By Amount</button>
+                  <button className={leaderboard === "frequency" ? "selected" : ""} onClick={() => setLeaderboard("frequency")}>By Frequency</button>
+                </div>
+              </div>
+              <Link to="/expenses" className="dashboard-link">View All</Link>
+            </div>
+            <div className="dashboard-high-list">
+              {highestByWho.slice(0, 4).map((item) => (
+                <button className="dashboard-high-row" key={item.name} onClick={() => navigate(`/expenses?search=${encodeURIComponent(item.name)}`)}>
+                  <span className="dashboard-category-icon">{item.type === "Client" ? <Building2 size={19} /> : <UserRound size={19} />}</span>
+                  <span className="dashboard-row-detail"><strong>{item.name}</strong><small>{item.type}</small></span>
+                  <strong className="dashboard-row-amount">{leaderboard === "amount" ? formatRupees(item.amount) : `${item.count} entries`}</strong>
+                </button>
+              ))}
+              {highestByWho.length === 0 && <div className="dashboard-empty"><p>No expenses recorded yet.</p>{import.meta.env.DEV && <button className="dashboard-demo-button" type="button" onClick={() => { if (demoLoaded) { replaceExpenses([]); setDemoLoaded(false); } else { replaceExpenses(createDemoExpenses()); setDemoLoaded(true); } }}>{demoLoaded ? "Clear demo data" : "Load demo data"}</button>}</div>}
+            </div>
+          </section>
+
+          <section className="dashboard-spending-hero panel">
+            <div className="spending-hero-main">
+              <span className="spending-month-pill">{monthName} Spending</span>
+              <strong className="spending-hero-total">{formatRupees(total)}</strong>
+              <div className="spending-hero-meta">
+                <span><ReceiptText size={13} /> {monthlyExpenses.length} expenses</span>
+                <i />
+                <span>{formatRupees(average)} average per expense</span>
+              </div>
+              <Link className="spending-add-button" to="/expenses/new"><Plus size={15} /> Add Expense</Link>
+            </div>
+            <div className="spending-insight">
+              <div className="insight-mark"><ChartNoAxesCombined size={27} /><Sparkles className="insight-sparkles" size={14} /></div>
+              <p>{monthlyExpenses.length ? `You've recorded ${monthlyExpenses.length} expenses across ${clients} clients, ${employees} employees and company operations.` : "Your monthly spending insight will appear here once expenses are recorded."}</p>
+            </div>
+            <span className="insight-orb" />
+          </section>
         </div>
-        <button
-          className="button button-primary"
-          onClick={() => downloadExpensesCsv(expenses)}
-        >
-          <Download size={16} />
-          Download Full Report
-        </button>
-      </section>
-    </>
+
+        <section className="dashboard-analytics-grid">
+          <article className="dashboard-analytics-card panel">
+            <div className="dashboard-panel-heading">
+              <h2>Who are we spending for?</h2>
+              <Link to="/analytics" className="dashboard-link">View Breakdown</Link>
+            </div>
+            <div className="dashboard-breakdown-list">
+              {byWho.slice(0, 4).map((item) => <BreakdownRow key={item.name} label={item.name === "Client" ? "Clients" : item.name === "Employee" ? "Employees" : item.name} amount={item.amount} total={total} />)}
+              {byWho.length === 0 && <p className="dashboard-empty">Spending breakdown will appear when expenses are added.</p>}
+            </div>
+          </article>
+          <article className="dashboard-analytics-card panel">
+            <div className="dashboard-panel-heading">
+              <h2>What are we spending on?</h2>
+              <Link to="/analytics" className="dashboard-link">View All Categories</Link>
+            </div>
+            <div className="dashboard-category-list">
+              {byCategory.slice(0, 6).map((item) => <BreakdownRow key={item.name} label={item.name} amount={item.amount} total={total} compact />)}
+              {byCategory.length === 0 && <p className="dashboard-empty">Category breakdown will appear when expenses are added.</p>}
+            </div>
+          </article>
+        </section>
+
+        <section className="dashboard-documents panel">
+          <div className="dashboard-doc-title"><h2>Documentation Status</h2></div>
+          <div className="document-status-grid">
+            <article className="document-status-card">
+              <Check size={20} />
+              <div><strong>{attached} Bills Attached</strong><small>Verified documentation</small></div>
+            </article>
+            <article className="document-status-card missing">
+              <FileWarning size={21} />
+              <div><strong>{missing} Bills Missing</strong><small>Action required</small></div>
+            </article>
+            <article className="document-status-card">
+              <CalendarDays size={20} />
+              <div><strong>{pending} To Review</strong><small>Pending verification</small></div>
+            </article>
+          </div>
+        </section>
+
+        <section className="dashboard-transactions panel">
+          <div className="transactions-heading">
+            <h2>Recent Expenses</h2>
+            <Link to="/expenses" className="dashboard-link">View All</Link>
+          </div>
+          <div className="dashboard-table-wrap">
+            <table className="dashboard-table transactions-table">
+              <thead><tr><th>DATE</th><th>PAID FOR</th><th>TYPE</th><th>PURPOSE</th><th>BILL</th><th>STATUS</th><th>AMOUNT</th></tr></thead>
+              <tbody>
+                {recent.slice(0, 2).map((expense: Expense) => (
+                  <tr key={expense.id} onClick={() => navigate(`/expenses/${expense.id}`)}>
+                    <td>{formatDate(expense.date)}</td>
+                    <td><strong>{expense.paidFor}</strong></td>
+                    <td><span className="dashboard-type-pill">{expense.paidForType}</span></td>
+                    <td>{expense.purpose}</td>
+                    <td><span className={expense.receipt ? "bill-attached" : "bill-missing"}>{expense.receipt ? "✓" : "×"}</span></td>
+                    <td><StatusBadge status={expense.status} /></td>
+                    <td><strong>{formatRupees(expense.amount)}</strong></td>
+                  </tr>
+                ))}
+                {recent.length === 0 && <tr><td colSpan={7} className="dashboard-table-empty">No expenses recorded yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <footer className="dashboard-summary">
+          <div><span>{monthName.toUpperCase()} {year} SUMMARY</span><strong>{formatRupees(total)} <i>•</i> {monthlyExpenses.length} Entries <i>•</i> {missing} Missing Bills</strong></div>
+          <button className="dashboard-report-button" onClick={() => downloadExpensesCsv(expenses)}><Download size={16} /> Download Full Report</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function BreakdownRow({
+  label,
+  amount,
+  total,
+  compact = false,
+}: {
+  label: string;
+  amount: number;
+  total: number;
+  compact?: boolean;
+}) {
+  const share = total ? Math.round((amount / total) * 100) : 0;
+  return (
+    <div className={`breakdown-row ${compact ? "compact" : ""}`}>
+      <div className="breakdown-labels"><span>{label}</span><strong>{formatRupees(amount)}{compact ? "" : ` (${share}%)`}</strong></div>
+      <div className="breakdown-track"><span style={{ width: `${share}%` }} /></div>
+    </div>
   );
 }

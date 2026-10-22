@@ -1,6 +1,6 @@
 # DesFlyer Internal Expense
 
-A small React + TypeScript frontend for the internal expense system. The data is sample data stored in memory; it resets when the page is refreshed.
+A small React + TypeScript frontend for the internal expense system. The app starts with no expense records. New records are stored in memory and reset when the page is refreshed.
 
 ## Run locally
 
@@ -13,7 +13,7 @@ Create a production build with `npm run build`.
 
 ## Where to make common changes
 
-- Change the sample expenses in `src/data/expenses.ts`.
+- Initial expense records are set in `src/data/expenses.ts`.
 - Connect the app to a backend later in `src/services/expenseService.ts`.
 - Add or edit a screen in `src/pages/` and connect its URL in `src/App.tsx`.
 - Shared navigation and page layout are in `src/components/Layout.tsx`.
@@ -22,4 +22,4 @@ Create a production build with `npm run build`.
 
 ## Screens
 
-Dashboard, add/edit expense, expense records, transaction details, analytics and a mock login screen. The login screen is for demonstration only; it does not authenticate users.
+Dashboard, add/edit expense, expense records, transaction details, analytics and a mock login screen. The login screen does not authenticate users.

@@ -13,6 +13,7 @@ type ExpenseStore = {
   addExpense: (input: ExpenseInput) => Expense;
   updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
+  replaceExpenses: (expenses: Expense[]) => void;
 };
 
 const ExpenseContext = createContext<ExpenseStore | null>(null);
@@ -33,6 +34,10 @@ export function ExpenseProvider({ children }: { children: ReactNode }) {
       },
       deleteExpense: (id) => {
         expenseService.remove(id);
+        setExpenses(expenseService.getAll());
+      },
+      replaceExpenses: (records) => {
+        expenseService.replaceAll(records);
         setExpenses(expenseService.getAll());
       },
     }),

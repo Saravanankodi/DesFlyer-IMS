@@ -1,7 +1,5 @@
 import { useState } from "react";
 import {
-  ArrowLeft,
-  Check,
   Download,
   FileText,
   Pencil,
@@ -13,7 +11,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { formatDate, formatRupees } from "../data/expenses";
 import { useExpenses } from "../store";
-import { PageHeading, StatusBadge, useToast } from "../components/Shared";
+import { StatusBadge, useToast } from "../components/Shared";
 
 export function ExpenseDetail() {
   const { id = "" } = useParams();
@@ -45,158 +43,85 @@ export function ExpenseDetail() {
 
   return (
     <>
-      <PageHeading
-        title="Transaction Details"
-        description="Complete expense information and supporting documents."
-        action={
-          <div className="heading-actions">
-            <Link className="button button-outline" to="/expenses">
-              <ArrowLeft size={15} />
-              Back
-            </Link>
-            <Link
-              className="button button-primary"
-              to={`/expenses/${expense.id}/edit`}
-            >
-              <Pencil size={15} />
-              Edit Expense
-            </Link>
-          </div>
-        }
-      />
-      <section className="detail-hero panel">
-        <div className="detail-id">
-          <div className="document-icon">
-            <FileText size={22} />
-          </div>
-          <div>
-            <span>TRANSACTION ID</span>
-            <strong>{expense.id}</strong>
-            <small>{formatDate(expense.date)}</small>
-          </div>
+      <div className="detail-page-heading">
+        <Link className="detail-back" to="/expenses" aria-label="Back to expense records">←</Link>
+        <div><h1>Transaction Details</h1><p>Complete expense information and supporting documents.</p></div>
+        <Link className="button button-primary" to={`/expenses/${expense.id}/edit`}><Pencil size={15} /> Edit Expense</Link>
+      </div>
+      <div className="detail-workspace">
+        <div className="detail-left-column">
+          <section className="panel detail-summary-card">
+            <div className="detail-summary-heading">
+              <div className="detail-id">
+              <div className="document-icon"><FileText size={22} /></div>
+                <div>
+                  <span>TRANSACTION ID</span>
+                  <strong>{expense.id}</strong>
+                </div>
+              </div>
+              <div className="detail-status-block">
+                <StatusBadge status={expense.status} />
+                <small>{formatDate(expense.date)}</small>
+              </div>
+            </div>
+            <div className="detail-summary-values">
+              <div><span>AMOUNT</span><strong>{formatRupees(expense.amount)}</strong></div>
+              <div><span>PAYMENT METHOD</span><strong><FileText size={18} /> {expense.paymentMethod ?? "Bank Transfer"}</strong></div>
+              <div><span>CREATED BY</span><strong>Current User</strong></div>
+            </div>
+          </section>
+          <section className="panel info-panel">
+            <h2>Expense Information</h2>
+            <dl className="detail-fields">
+              <div><dt>Paid For</dt><dd>{expense.paidFor}<small>{expense.paidForType}</small></dd></div>
+              <div><dt>Department</dt><dd>{expense.department || "—"}</dd></div>
+              <div><dt>Category</dt><dd>{expense.category}</dd></div>
+              <div><dt>Project</dt><dd>{expense.vendor || "—"}</dd></div>
+              <div className="detail-notes-field"><dt>Notes</dt><dd>{expense.purpose}</dd></div>
+            </dl>
+          </section>
         </div>
-        <StatusBadge status={expense.status} />
-        <div className="detail-amount">
-          <span>AMOUNT</span>
-          <strong>{formatRupees(expense.amount)}</strong>
-          <span>Payment method · Bank Transfer</span>
-        </div>
-      </section>
-      <div className="detail-grid">
-        <section className="panel info-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Expense Information</h2>
-              <p>Recorded details for this expense.</p>
-            </div>
-          </div>
-          <dl className="detail-fields">
-            <div>
-              <dt>Vendor / Client</dt>
-              <dd>{expense.vendor}</dd>
-            </div>
-            <div>
-              <dt>Category</dt>
-              <dd>{expense.category}</dd>
-            </div>
-            <div>
-              <dt>Paid for</dt>
-              <dd>{expense.paidFor}</dd>
-            </div>
-            <div>
-              <dt>Expense for</dt>
-              <dd>{expense.paidForType}</dd>
-            </div>
-            <div>
-              <dt>Expense date</dt>
-              <dd>{formatDate(expense.date)}</dd>
-            </div>
-            <div className="detail-full">
-              <dt>Purpose</dt>
-              <dd>{expense.purpose}</dd>
-            </div>
-            <div>
-              <dt>Created by</dt>
-              <dd>Admin User</dd>
-            </div>
-            <div>
-              <dt>Receipt status</dt>
-              <dd>
-                {expense.receipt ? "Receipt attached" : "Receipt missing"}
-              </dd>
-            </div>
-          </dl>
-        </section>
-        <aside className="panel supporting-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Supporting Documents</h2>
-              <p>Receipts linked to this expense.</p>
-            </div>
-            <button
-              className="text-button"
-              onClick={() =>
-                showToast("File upload is available in Add Expense.")
-              }
-            >
-              <Upload size={15} />
-              Add File
+        <aside className="panel detail-quick-actions">
+          <h2>ACTIONS</h2>
+          <div className="detail-action-buttons">
+            <Link className="button button-primary" to={`/expenses/${expense.id}/edit`}>
+              <Pencil size={18} /> Edit Expense
+            </Link>
+            <button className="button button-outline" onClick={() => showToast("Use Print to save a PDF copy of this expense.")}>
+              <Download size={18} /> Download PDF
+            </button>
+            <button className="button button-outline" onClick={() => window.print()}>
+              <Printer size={18} /> Print
+            </button>
+            <button className="button button-outline detail-review-button" onClick={markReviewed}>
+              <ShieldCheck size={18} /> Mark as Reviewed
             </button>
           </div>
-          {expense.receipt ? (
-            <div className="document-row">
-              <span className="file-icon">
-                <FileText size={18} />
-              </span>
-              <span>
-                <strong>Receipt.pdf</strong>
-                <small>Uploaded with this expense</small>
-              </span>
-              <button
-                className="icon-button"
-                aria-label="Download receipt"
-                onClick={() =>
-                  showToast("Demo receipt file is not available to download.")
-                }
-              >
-                <Download size={16} />
-              </button>
-            </div>
-          ) : (
-            <div className="empty-document">
-              <FileText size={22} />
-              <strong>No receipt attached</strong>
-              <span>Add a receipt to complete this record.</span>
-            </div>
-          )}
+          <button className="detail-delete-button" onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={18} /> Delete Expense
+          </button>
         </aside>
+        <section className="panel supporting-panel">
+          <div className="supporting-heading">
+            <h2>Supporting Documents</h2>
+            <button className="text-button" onClick={() => showToast("File upload is available in Add Expense.")}>
+              <Upload size={15} /> Add File
+            </button>
+          </div>
+          <div className="supporting-documents-grid">
+            <article className="supporting-document-card">
+              <div className="supporting-document-preview">
+                <FileText size={30} />
+                {!expense.receipt && <span>No preview attached</span>}
+              </div>
+              <strong>{expense.receipt ? "Receipt.pdf" : "Receipt not attached"}</strong>
+              <small>{expense.receipt ? "Uploaded with this expense" : "Add a receipt to complete this record."}</small>
+            </article>
+            <article className="supporting-document-card supporting-placeholder"><div className="supporting-document-preview"><Upload size={24} /><span>Upload supporting file</span></div></article>
+            <article className="supporting-document-card supporting-placeholder"><div className="supporting-document-preview"><Upload size={24} /><span>Upload supporting file</span></div></article>
+          </div>
+        </section>
       </div>
-      <section className="panel action-panel">
-        <div>
-          <h2>Actions</h2>
-          <p>Update the review status or manage this expense.</p>
-        </div>
-        <div className="heading-actions">
-          <button
-            className="button button-outline"
-            onClick={() => window.print()}
-          >
-            <Printer size={15} />
-            Print
-          </button>
-          <button className="button button-outline" onClick={markReviewed}>
-            <ShieldCheck size={15} />
-            Mark as reviewed
-          </button>
-          <button
-            className="button button-danger"
-            onClick={() => setConfirmDelete(true)}
-          >
-            <Trash2 size={15} />
-            Delete expense
-          </button>
-        </div>
-      </section>
       {confirmDelete && (
         <div className="modal-backdrop" role="presentation">
           <section
@@ -210,7 +135,7 @@ export function ExpenseDetail() {
             </span>
             <h2 id="delete-title">Delete this expense?</h2>
             <p>
-              This will remove <strong>{expense.id}</strong> from the demo
+              This will remove <strong>{expense.id}</strong> from the expense
               records.
             </p>
             <div className="heading-actions">

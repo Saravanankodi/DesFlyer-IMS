@@ -4,9 +4,9 @@ import {
   LockKeyhole,
   Mail,
   ShieldCheck,
-  Wallet,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import brandLogo from "../assets/desflyer-logo.png";
 
 export function Login() {
   const navigate = useNavigate();
@@ -24,33 +24,11 @@ export function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-decoration">
-        <div className="login-brand">
-          <span className="brand-mark">
-            <Wallet size={20} />
-          </span>
-          <strong>DesFlyer</strong>
-        </div>
-        <div className="login-message">
+      <div className="login-shell">
+        <header className="login-brand">
+          <img src={brandLogo} alt="DesFlyer" />
           <span>INTERNAL EXPENSE MANAGEMENT SYSTEM</span>
-          <h1>
-            Clarity for every
-            <br />
-            company expense.
-          </h1>
-          <p>
-            One secure workspace to record, review and understand your team's
-            spending.
-          </p>
-          <div className="login-feature">
-            <ShieldCheck size={18} /> Built for authorized DesFlyer employees
-          </div>
-        </div>
-        <div className="login-decoration-footer">
-          © 2026 DesFlyer · Internal use only
-        </div>
-      </div>
-      <main className="login-main">
+        </header>
         <div className="login-form-wrap">
           <span className="workspace-pill">WORKSPACE ACCESS</span>
           <h2>Welcome Back</h2>
@@ -90,7 +68,7 @@ export function Login() {
                 type="button"
                 onClick={() =>
                   setError(
-                    "Contact your administrator to reset your demo password.",
+                    "Contact your administrator to reset your password.",
                   )
                 }
               >
@@ -106,16 +84,14 @@ export function Login() {
             </button>
           </form>
           <div className="login-disclaimer">
-            Secure access for authorized DesFlyer employees only
+            <ShieldCheck size={13} /> Secure access for authorized DesFlyer employees only
           </div>
         </div>
         <div className="login-footer">
-          <span>© 2026 DesFlyer</span>
-          <Link to="/">Demo workspace</Link>
-          <span>Version 1.0</span>
-          <span>Privacy</span>
+          <span>© 2026 DesFlyer</span><i>•</i><span>Internal Use Only</span><i>•</i><Link to="/">Privacy</Link><i>•</i><Link to="/">Support</Link><i>•</i><span>Version 1.0</span>
         </div>
-      </main>
+      </div>
+      <footer className="login-site-footer"><span>© 2026 Internal Expense. Discover. Build. Share. Innovate.</span><strong>POWERED BY DESFLYER</strong></footer>
     </div>
   );
 }

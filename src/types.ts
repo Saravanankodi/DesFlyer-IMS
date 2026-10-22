@@ -9,6 +9,8 @@ export type Expense = {
   purpose: string;
   paidFor: string;
   paidForType: PaidForType;
+  department?: string;
+  paymentMethod?: string;
   status: ExpenseStatus;
   receipt: boolean;
 };

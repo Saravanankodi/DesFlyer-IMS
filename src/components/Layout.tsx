@@ -3,19 +3,18 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Bell,
+  CalendarDays,
   ChevronDown,
   CircleHelp,
   FileText,
   LayoutDashboard,
-  Menu,
   Plus,
   Search,
   Settings,
-  Wallet,
-  X,
 } from "lucide-react";
 import { useExpenses } from "../store";
 import { downloadExpensesCsv } from "../data/expenses";
+import brandLogo from "../assets/desflyer-logo.png";
 
 const navigation = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -25,7 +24,6 @@ const navigation = [
 ];
 
 export function Layout() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [headerSearch, setHeaderSearch] = useState("");
   const location = useLocation();
@@ -41,29 +39,21 @@ export function Layout() {
     (location.pathname.endsWith("/edit") ? "Edit Expense" : undefined) ??
     navigation.find((item) => item.path === location.pathname)?.label ??
     (location.pathname.includes("/expenses/")
-      ? "Transaction Details"
+      ? "Expense Records"
       : "Internal Expense");
+  const isTransactionRoute = /^\/expenses\/[^/]+(?:\/edit)?$/.test(location.pathname) && !location.pathname.endsWith("/new");
+  const topbarAddAction = ["/expenses", "/analytics"].includes(location.pathname) || isTransactionRoute;
+  const showCalendar = topbarAddAction || location.pathname === "/expenses/new";
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
+      <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">
-            <Wallet size={19} />
-          </span>
           <span>
-            <strong>DesFlyer</strong>
+            <img className="brand-logo" src={brandLogo} alt="DesFlyer" />
             <small>Internal Expense</small>
           </span>
-          <button
-            className="icon-button mobile-close"
-            onClick={() => setMenuOpen(false)}
-            aria-label="Close navigation"
-          >
-            <X size={18} />
-          </button>
         </div>
-        <div className="nav-caption">WORKSPACE</div>
         <nav className="side-nav">
           {navigation.map(({ label, path, icon: Icon }) => (
             <NavLink
@@ -73,7 +63,6 @@ export function Layout() {
               className={({ isActive }) =>
                 `nav-link ${isActive ? "active" : ""}`
               }
-              onClick={() => setMenuOpen(false)}
             >
               <Icon size={18} strokeWidth={1.8} />
               <span>{label}</span>
@@ -88,7 +77,7 @@ export function Layout() {
             className="bottom-link"
             onClick={() =>
               setNotice(
-                "Settings are managed by your Finance administrator in this demo.",
+                "Settings are managed by your Finance administrator.",
               )
             }
           >
@@ -107,32 +96,21 @@ export function Layout() {
           <div className="profile">
             <span className="avatar">AU</span>
             <span>
-              <strong>Admin User</strong>
+              <strong>Current User</strong>
               <small>Finance Dept.</small>
             </span>
             <ChevronDown size={15} />
           </div>
         </div>
       </aside>
-      {menuOpen && (
-        <button
-          className="mobile-scrim"
-          aria-label="Close navigation"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
       <main className="main-area">
+        <div className="mobile-brand"><img src={brandLogo} alt="DesFlyer" /><span>Internal Expense</span></div>
         <header className="topbar">
-          <button
-            className="icon-button mobile-menu"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open navigation"
-          >
-            <Menu size={20} />
-          </button>
           <span className="topbar-title">{title}</span>
           <div className="topbar-actions">
-            <label className="global-search">
+            {topbarAddAction && <NavLink className="button button-primary topbar-add-expense" to="/expenses/new"><Plus size={16} /> Add Expense</NavLink>}
+            {topbarAddAction && <span className="topbar-month"><CalendarDays size={15} /> July 2026</span>}
+            {!topbarAddAction && <label className="global-search">
               <Search size={16} />
               <input
                 placeholder="Search expenses..."
@@ -154,7 +132,7 @@ export function Layout() {
                   }
                 }}
               />
-            </label>
+            </label>}
             <button
               className="icon-button topbar-icon"
               aria-label="Notifications"
@@ -163,6 +141,7 @@ export function Layout() {
               <Bell size={18} />
               <i />
             </button>
+            {showCalendar && <button className="icon-button topbar-icon" aria-label="Calendar" onClick={() => setNotice("Choose a month from the page filters.")}><CalendarDays size={18} /></button>}
             <button
               className="button button-outline top-report"
               onClick={() => downloadExpensesCsv(expenses)}
@@ -181,6 +160,9 @@ export function Layout() {
           </span>
           <strong>POWERED BY DESFLYER</strong>
         </footer>
+        <nav className="mobile-bottom-nav" aria-label="Main navigation">
+          {navigation.map(({ label, path, icon: Icon }) => <NavLink key={path} to={path} end={path === "/"} aria-label={label} className={({ isActive }) => isActive ? "active" : ""}><Icon size={21} /></NavLink>)}
+        </nav>
         {notice && (
           <div role="status" className="toast">
             <span className="toast-check">✓</span>

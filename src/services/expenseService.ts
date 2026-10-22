@@ -1,17 +1,20 @@
 import { startingExpenses } from "../data/expenses";
 import type { Expense, ExpenseInput } from "../types";
 
-// UI pages use this service instead of reading demo data directly.
+// UI pages use this service for expense records.
 // Replace these functions with API requests when the storage service is ready.
 let expenses = [...startingExpenses];
 
 export const expenseService = {
   getAll: () => expenses,
   getById: (id: string) => expenses.find((expense) => expense.id === id),
+  replaceAll: (records: Expense[]) => {
+    expenses = [...records];
+  },
   add: (input: ExpenseInput): Expense => {
     const expense: Expense = {
       ...input,
-      id: `EXP-2026-${String(Date.now()).slice(-4)}`,
+      id: `EXP-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
       status: "Pending",
       receipt: input.receipt ?? false,
     };

@@ -20,6 +20,7 @@ export function AddExpense() {
     existingExpense ? String(existingExpense.amount) : "",
   );
   const [vendor, setVendor] = useState(existingExpense?.vendor ?? "");
+  const [department, setDepartment] = useState(existingExpense?.department ?? "");
   const [category, setCategory] = useState(existingExpense?.category ?? "");
   const [expenseDate, setExpenseDate] = useState(
     existingExpense?.date ?? new Date().toISOString().slice(0, 10),
@@ -52,6 +53,8 @@ export function AddExpense() {
       purpose: String(form.get("purpose")).trim(),
       paidFor: String(form.get("paidFor")).trim(),
       paidForType: forType,
+      department: String(form.get("department")).trim(),
+      paymentMethod: String(form.get("paymentMethod")),
       receipt: Boolean(fileName),
     };
     if (existingExpense) {
@@ -84,46 +87,8 @@ export function AddExpense() {
             </div>
             <span className="required-pill">REQUIRED INFORMATION</span>
           </div>
-          <div className="form-grid">
-            <label className="field">
-              <span>
-                Vendor / Client <i>*</i>
-              </span>
-              <input
-                required
-                name="vendor"
-                placeholder="e.g. ABC Technologies"
-                value={vendor}
-                onChange={(event) => setVendor(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>
-                Category <i>*</i>
-              </span>
-              <select
-                name="category"
-                required
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
-              >
-                <option value="" disabled>
-                  Select a category
-                </option>
-                {[
-                  "Travel",
-                  "Meals",
-                  "Equipment",
-                  "Software",
-                  "Office",
-                  "Utilities",
-                  "Other",
-                ].map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
+          <div className="field-stack">
+            <label className="field field-amount">
               <span>
                 Amount <i>*</i>
               </span>
@@ -141,79 +106,79 @@ export function AddExpense() {
                 />
               </div>
             </label>
+            <fieldset className="paid-for-group">
+              <legend>Who is this expense for?</legend>
+              <div className="choice-row">
+                {["Client", "Employee", "Company / Office", "Other"].map(
+                  (option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={`choice ${forType === option ? "choice-active" : ""}`}
+                      onClick={() => setForType(option as PaidForType)}
+                    >
+                      {forType === option && <Check size={14} />}
+                      {option}
+                    </button>
+                  ),
+                )}
+              </div>
+            </fieldset>
+            <label className="field">
+              <span>Enter Name / Description <i>*</i></span>
+              <input required name="vendor" placeholder="e.g. Project 'Z' lunch" value={vendor} onChange={(event) => setVendor(event.target.value)} />
+            </label>
+            <div className="form-paired-fields">
+              <label className="field">
+                <span>What was this expense for? <i>*</i></span>
+                <select name="category" required value={category} onChange={(event) => setCategory(event.target.value)}>
+                  <option value="" disabled>Select a category</option>
+                  {["Petrol / Travel", "Food / Meeting", "Hardware", "Software / Cloud", "Internet / Subscription", "Office", "Other"].map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span>Expense Date <i>*</i></span>
+                <input required type="date" name="date" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)} />
+              </label>
+            </div>
+            <label className="field">
+              <span>
+                Purpose <i>*</i>
+              </span>
+              <textarea
+                required
+                name="purpose"
+                rows={4}
+                placeholder="Briefly describe what this expense was for..."
+                defaultValue={existingExpense?.purpose}
+              />
+            </label>
+            <div className="form-paired-fields">
+              <label className="field">
+                <span>
+                  {forType === "Other" ? "Enter name" : "Paid for"} <i>*</i>
+                </span>
+                <input
+                  required
+                  name="paidFor"
+                  placeholder={forType === "Client" ? "Client or project name" : "Name or team"}
+                  defaultValue={existingExpense?.paidFor}
+                />
+              </label>
+              <label className="field">
+                <span>Department</span>
+                <input name="department" placeholder="e.g. Development" value={department} onChange={(event) => setDepartment(event.target.value)} />
+              </label>
+            </div>
             <label className="field">
               <span>Payment Method</span>
-              <select name="payment" defaultValue="Bank Transfer">
+              <select name="paymentMethod" defaultValue={existingExpense?.paymentMethod ?? "Bank Transfer"}>
                 <option>Bank Transfer</option>
                 <option>Company Card</option>
                 <option>Cash</option>
                 <option>UPI</option>
               </select>
             </label>
-          </div>
-          <fieldset className="paid-for-group">
-            <legend>Who is this expense for?</legend>
-            <div className="choice-row">
-              {["Client", "Employee", "Company / Office", "Other"].map(
-                (option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className={`choice ${forType === option ? "choice-active" : ""}`}
-                    onClick={() => setForType(option as PaidForType)}
-                  >
-                    {forType === option && <Check size={14} />}
-                    {option}
-                  </button>
-                ),
-              )}
-            </div>
-          </fieldset>
-          <label className="field">
-            <span>
-              {forType === "Other" ? "Enter name" : "Paid for"} <i>*</i>
-            </span>
-            <input
-              required
-              name="paidFor"
-              placeholder={
-                forType === "Client" ? "Client or project name" : "Name or team"
-              }
-              defaultValue={existingExpense?.paidFor}
-            />
-          </label>
-          <label className="field">
-            <span>
-              Expense purpose <i>*</i>
-            </span>
-            <textarea
-              required
-              name="purpose"
-              rows={4}
-              placeholder="Briefly describe what this expense was for..."
-              defaultValue={existingExpense?.purpose}
-            />
-          </label>
-          <label className="field field-date">
-            <span>
-              Expense date <i>*</i>
-            </span>
-            <input
-              required
-              type="date"
-              name="date"
-              value={expenseDate}
-              onChange={(event) => setExpenseDate(event.target.value)}
-            />
-          </label>
-          <div className="form-actions">
-            <Link className="button button-outline" to="/expenses">
-              Cancel
-            </Link>
-            <button className="button button-primary" type="submit">
-              <Plus size={16} />
-              {existingExpense ? "Save Changes" : "Save Expense"}
-            </button>
           </div>
         </section>
         <aside className="form-side">
@@ -239,9 +204,6 @@ export function AddExpense() {
               </span>
               <strong>{fileName || "Upload bill or receipt"}</strong>
               <small>PDF, JPG or PNG (max 5 MB)</small>
-              <span className="button button-outline button-small">
-                Browse files
-              </span>
             </button>
             <input
               ref={inputRef}
@@ -300,6 +262,15 @@ export function AddExpense() {
             </p>
           </section>
         </aside>
+        <div className="form-actions">
+          <Link className="button button-outline" to="/expenses">
+            Cancel
+          </Link>
+          <button className="button button-primary" type="submit">
+            <Plus size={16} />
+            {existingExpense ? "Save Changes" : "Save Expense"}
+          </button>
+        </div>
       </form>
     </>
   );
