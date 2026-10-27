@@ -1,6 +1,7 @@
 node_modules/
 dist/
 *.tsbuildinfo
+__pycache__/
 .figma-parser/
 figma-extract/
 figma-preview.png

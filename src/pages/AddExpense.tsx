@@ -1,10 +1,116 @@
-import { useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Check, CloudUpload, FileText, Plus, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Check, CloudUpload, FileText, Image as ImageIcon, Plus, ReceiptText, X } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { formatDate, formatRupees } from "../data/expenses";
+import { getCurrentMonthValue } from "../data/dates";
 import { useExpenses } from "../store";
 import { PageHeading } from "../components/Shared";
+import { MonthPicker } from "../components/MonthPicker";
 import type { PaidForType } from "../types";
+
+const MAX_RECEIPT_SIZE = 5 * 1024 * 1024;
+
+function SavedValueInput({
+  name,
+  value,
+  onChange,
+  suggestions,
+  placeholder,
+  required = false,
+}: {
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+  suggestions: string[];
+  placeholder: string;
+  required?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const query = value.trim().toLocaleLowerCase();
+  const matches = query
+    ? suggestions.filter((item) => item.toLocaleLowerCase().startsWith(query) && item.toLocaleLowerCase() !== query)
+    : [];
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, []);
+
+  return (
+    <div className="saved-value-input" ref={containerRef}>
+      <input
+        name={name}
+        required={required}
+        placeholder={placeholder}
+        value={value}
+        autoComplete="off"
+        aria-autocomplete="list"
+        aria-expanded={open && matches.length > 0}
+        onFocus={() => setOpen(false)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setOpen(Boolean(event.target.value.trim()));
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setOpen(false);
+          if (event.key === "ArrowDown" && matches.length) setOpen(true);
+        }}
+      />
+      {open && matches.length > 0 && (
+        <div className="saved-value-options" role="listbox" aria-label={`Saved ${name} values`}>
+          {matches.map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="option"
+              aria-selected="false"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onChange(item);
+                setOpen(false);
+              }}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReceiptPreview({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const [previewUrl, setPreviewUrl] = useState("");
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  const isImage = file.type.startsWith("image/") || ["jpg", "jpeg", "png"].includes(extension ?? "");
+  const isPdf = file.type === "application/pdf" || extension === "pdf";
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  return (
+    <div className={`receipt-preview-tile ${isImage ? "receipt-preview-image" : "receipt-preview-document"}`}>
+      {isImage && previewUrl ? (
+        <img src={previewUrl} alt={file.name} />
+      ) : isPdf && previewUrl ? (
+        <iframe className="receipt-preview-pdf" src={previewUrl} title={`Preview of ${file.name}`} />
+      ) : (
+        <div className="receipt-preview-file-icon">
+          {file.type === "application/pdf" ? <FileText size={24} /> : <ImageIcon size={24} />}
+        </div>
+      )}
+      <span title={file.name}>{file.name}</span>
+      <button type="button" aria-label={`Remove ${file.name}`} onClick={onRemove}><X size={14} /></button>
+    </div>
+  );
+}
 
 export function AddExpense() {
   const { addExpense, expenses, updateExpense } = useExpenses();
@@ -12,15 +118,15 @@ export function AddExpense() {
   const { id } = useParams();
   const existingExpense = expenses.find((item) => item.id === id);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [fileName, setFileName] = useState(
-    existingExpense?.receipt ? "Current receipt attached" : "",
-  );
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [error, setError] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue);
   const [amount, setAmount] = useState(
     existingExpense ? String(existingExpense.amount) : "",
   );
   const [vendor, setVendor] = useState(existingExpense?.vendor ?? "");
   const [department, setDepartment] = useState(existingExpense?.department ?? "");
+  const [paidFor, setPaidFor] = useState(existingExpense?.paidFor ?? "");
   const [category, setCategory] = useState(existingExpense?.category ?? "");
   const [expenseDate, setExpenseDate] = useState(
     existingExpense?.date ?? new Date().toISOString().slice(0, 10),
@@ -28,21 +134,30 @@ export function AddExpense() {
   const [forType, setForType] = useState<PaidForType>(
     existingExpense?.paidForType ?? "Client",
   );
-  const handleFile = (file?: File) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setError("The file must be smaller than 5 MB.");
+  const savedDepartments = Array.from(new Set(
+    expenses.map((expense) => expense.department?.trim()).filter((value): value is string => Boolean(value)),
+  ));
+  const savedPaidForValues = Array.from(new Set(
+    expenses.map((expense) => expense.paidFor.trim()).filter(Boolean),
+  ));
+  const handleFiles = (files: FileList | File[]) => {
+    const newFiles = Array.from(files);
+    if (!newFiles.length) return;
+    if (inputRef.current) inputRef.current.value = "";
+    const combinedFiles = [...uploadedFiles, ...newFiles];
+    if (combinedFiles.some((file) => file.size >= MAX_RECEIPT_SIZE) || combinedFiles.reduce((total, file) => total + file.size, 0) >= MAX_RECEIPT_SIZE) {
+      setError("All receipts together must be smaller than 5 MB.");
       return;
     }
-    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
-      setError("Choose a PDF, JPG or PNG file.");
+    if (combinedFiles.some((file) => !["application/pdf", "image/jpeg", "image/png"].includes(file.type))) {
+      setError("Choose PDF, JPG or PNG files.");
       return;
     }
     setError("");
-    setFileName(file.name);
+    setUploadedFiles(combinedFiles);
   };
 
-  const saveExpense = (event: FormEvent<HTMLFormElement>) => {
+  const saveExpense = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const values = {
@@ -55,13 +170,13 @@ export function AddExpense() {
       paidForType: forType,
       department: String(form.get("department")).trim(),
       paymentMethod: String(form.get("paymentMethod")),
-      receipt: Boolean(fileName),
+      receipt: Boolean(existingExpense?.receipt || uploadedFiles.length),
     };
     if (existingExpense) {
-      updateExpense(existingExpense.id, values);
+      await updateExpense(existingExpense.id, values);
       navigate(`/expenses/${existingExpense.id}`);
     } else {
-      const expense = addExpense(values);
+      const expense = await addExpense(values);
       navigate(`/expenses/${expense.id}`);
     }
   };
@@ -72,10 +187,12 @@ export function AddExpense() {
         title={existingExpense ? "Edit Expense" : "Add Expense"}
         description="Record a company expense and keep your monthly spending accurate."
         action={
-          <Link className="button button-outline" to="/expenses">
-            <ArrowLeft size={15} />
-            Back to records
-          </Link>
+          <MonthPicker
+            className="expense-month-picker"
+            value={selectedMonth}
+            onChange={setSelectedMonth}
+            label="Select expense month and year"
+          />
         }
       />
       <form className="expense-form" onSubmit={saveExpense}>
@@ -158,16 +275,24 @@ export function AddExpense() {
                 <span>
                   {forType === "Other" ? "Enter name" : "Paid for"} <i>*</i>
                 </span>
-                <input
-                  required
+                <SavedValueInput
                   name="paidFor"
+                  required
                   placeholder={forType === "Client" ? "Client or project name" : "Name or team"}
-                  defaultValue={existingExpense?.paidFor}
+                  value={paidFor}
+                  onChange={setPaidFor}
+                  suggestions={savedPaidForValues}
                 />
               </label>
               <label className="field">
                 <span>Department</span>
-                <input name="department" placeholder="e.g. Development" value={department} onChange={(event) => setDepartment(event.target.value)} />
+                <SavedValueInput
+                  name="department"
+                  placeholder="e.g. Development"
+                  value={department}
+                  onChange={setDepartment}
+                  suggestions={savedDepartments}
+                />
               </label>
             </div>
             <label className="field">
@@ -196,33 +321,32 @@ export function AddExpense() {
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
-                handleFile(event.dataTransfer.files[0]);
+                handleFiles(event.dataTransfer.files);
               }}
             >
               <span className="upload-icon">
                 <CloudUpload size={22} />
               </span>
-              <strong>{fileName || "Upload bill or receipt"}</strong>
-              <small>PDF, JPG or PNG (max 5 MB)</small>
+              <strong>{uploadedFiles.length ? `Add more receipts (${uploadedFiles.length} selected)` : "Upload bills or receipts"}</strong>
+              <small>PDF, JPG or PNG (all files together under 5 MB)</small>
             </button>
             <input
               ref={inputRef}
               className="sr-only"
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(event) => handleFile(event.target.files?.[0])}
+              multiple
+              onChange={(event) => event.target.files && handleFiles(event.target.files)}
             />
-            {fileName && (
+            {uploadedFiles.length > 0 && (
               <div className="file-chip">
-                <FileText size={17} />
                 <span>
-                  {fileName}
-                  <small>Ready to attach</small>
+                  {uploadedFiles.length} {uploadedFiles.length === 1 ? "file" : "files"} ready to attach
                 </span>
                 <button
                   type="button"
-                  onClick={() => setFileName("")}
-                  aria-label="Remove receipt"
+                  onClick={() => setUploadedFiles([])}
+                  aria-label="Remove all receipts"
                 >
                   <X size={16} />
                 </button>
@@ -237,28 +361,47 @@ export function AddExpense() {
                 <p>Preview of the details you entered.</p>
               </div>
             </div>
-            <div className="preview-id">
-              {existingExpense ? existingExpense.id : "DRAFT"} ·{" "}
-              {formatDate(expenseDate)}
-            </div>
-            <div className="preview-line">
-              <span>Vendor / Client</span>
-              <strong>{vendor || "Enter a vendor or client"}</strong>
-            </div>
-            <div className="preview-line">
-              <span>Category</span>
-              <strong>{category || "Select a category"}</strong>
-            </div>
-            <div className="preview-line">
-              <span>Expense date</span>
-              <strong>{formatDate(expenseDate)}</strong>
-            </div>
-            <div className="preview-total">
-              <span>TOTAL AMOUNT</span>
-              <strong>{formatRupees(Number(amount) || 0)}</strong>
+            <div className="expense-preview-card">
+              <div className="expense-preview-heading">
+                <span className="expense-preview-icon"><ReceiptText size={18} /></span>
+                <strong>RECEIPT PREVIEW</strong>
+                <small>{existingExpense ? existingExpense.id : "#DF-DRAFT"}</small>
+              </div>
+              <div className="preview-line">
+                <span>Vendor/Client</span>
+                <strong>{vendor || "Enter a vendor or client"}</strong>
+              </div>
+              <div className="preview-line">
+                <span>Category</span>
+                <strong>{category || "Select a category"}</strong>
+              </div>
+              <div className="preview-line">
+                <span>Date</span>
+                <strong>{formatDate(expenseDate)}</strong>
+              </div>
+              <div className="preview-total">
+                <span>TOTAL AMOUNT</span>
+                <strong>{formatRupees(Number(amount) || 0)}</strong>
+              </div>
+              {uploadedFiles.length > 0 ? (
+                <div className={`preview-placeholder receipt-preview-grid receipt-preview-count-${Math.min(uploadedFiles.length, 3)}`}>
+                  {uploadedFiles.map((file, index) => (
+                    <ReceiptPreview
+                      key={`${file.name}-${file.lastModified}-${index}`}
+                      file={file}
+                      onRemove={() => setUploadedFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="preview-placeholder">
+                  <ImageIcon size={24} aria-hidden="true" />
+                  <span>{existingExpense?.receipt ? "RECEIPT ALREADY ATTACHED" : "NO PREVIEW ATTACHED"}</span>
+                </div>
+              )}
             </div>
             <p className="preview-note">
-              Your expense will appear in the records as soon as you save it.
+              This is a digital generated preview based on your current inputs.
             </p>
           </section>
         </aside>

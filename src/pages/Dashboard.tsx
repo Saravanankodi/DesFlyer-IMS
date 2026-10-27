@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import {
   ArrowDownRight,
   Building2,
-  CalendarDays,
   ChartNoAxesCombined,
   Check,
+  CircleEllipsis,
   Download,
   FileWarning,
   Plus,
@@ -14,13 +14,14 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  createDemoExpenses,
   downloadExpensesCsv,
   formatDate,
   formatRupees,
 } from "../data/expenses";
 import { useExpenses } from "../store";
+import { getCurrentMonthValue } from "../data/dates";
 import { StatusBadge, useGlobalExpenseSearch } from "../components/Shared";
+import { MonthPicker } from "../components/MonthPicker";
 import type { Expense } from "../types";
 
 type GroupTotal = { name: string; type: string; amount: number; count: number };
@@ -46,12 +47,9 @@ function groupExpenses(
 }
 
 export function Dashboard() {
-  const { expenses, replaceExpenses } = useExpenses();
+  const { expenses } = useExpenses();
   const navigate = useNavigate();
-  const [demoLoaded, setDemoLoaded] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    return "2026-07";
-  });
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue);
   const [period, setPeriod] = useState<"Weekly" | "Daily">("Weekly");
   const [leaderboard, setLeaderboard] = useState<"amount" | "frequency">(
     "amount",
@@ -82,6 +80,14 @@ export function Dashboard() {
   const selectedDate = new Date(`${selectedMonth}-01T00:00:00`);
   const monthName = selectedDate.toLocaleDateString("en-US", { month: "long" });
   const year = selectedDate.getFullYear();
+  const daysInMonth = new Date(year, selectedDate.getMonth() + 1, 0).getDate();
+  const dailyTotals = getDailyTotals(monthlyExpenses, selectedMonth, daysInMonth);
+  const weeklyTotals = getWeeklyTotals(monthlyExpenses, selectedMonth, daysInMonth);
+  const chartTotals = period === "Daily" ? dailyTotals : weeklyTotals;
+  const dailyPeak = Math.max(...dailyTotals, 0);
+  const dailyPeakDay = dailyTotals.indexOf(dailyPeak) + 1;
+  const chartMax = Math.max(...chartTotals, 1);
+  const dailyTickDays = [...new Set([1, Math.round(daysInMonth * 0.25), Math.round(daysInMonth * 0.5), Math.round(daysInMonth * 0.75), daysInMonth])];
   const highestByWho = groupExpenses(filtered, "paidFor").sort((a, b) =>
     leaderboard === "amount" ? b.amount - a.amount : b.count - a.count,
   );
@@ -92,8 +98,6 @@ export function Dashboard() {
     (a, b) => b.amount - a.amount,
   );
   const recent = [...filtered].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
-  const chartValues = [12, 18, 25, 29.5];
-
   return (
     <div className="figma-dashboard">
       <header className="dashboard-heading">
@@ -102,17 +106,7 @@ export function Dashboard() {
           <p>A clear view of Desflyer&apos;s spending this month.</p>
         </div>
         <div className="dashboard-heading-actions">
-          <label className="dashboard-date">
-            <CalendarDays size={18} />
-            {monthName} {year}
-            <span className="chevron-down" />
-            <input
-              type="month"
-              aria-label="Select dashboard month"
-              value={selectedMonth}
-              onChange={(event) => setSelectedMonth(event.target.value)}
-            />
-          </label>
+          <MonthPicker className="dashboard-date" label="Select dashboard month and year" value={selectedMonth} onChange={setSelectedMonth} />
         </div>
       </header>
 
@@ -146,7 +140,7 @@ export function Dashboard() {
           <div className="dashboard-panel-heading">
             <div>
               <h2>Spending Trend</h2>
-              <p>Weekly expenditure overview</p>
+              <p>{period === "Weekly" ? "Weekly expenditure overview" : "Daily expenditure by date"}</p>
             </div>
             <div className="dashboard-period" aria-label="Chart period">
               {(["Weekly", "Daily"] as const).map((item) => (
@@ -162,13 +156,26 @@ export function Dashboard() {
           </div>
           <div className={`dashboard-plot dashboard-line-plot ${monthlyExpenses.length ? "has-trend-data" : ""}`}>
             {monthlyExpenses.length ? <>
-              <svg viewBox="0 0 1000 190" preserveAspectRatio="none" role="img" aria-label="Weekly spending trend">
-                <polyline className="trend-previous" points="112,133 350,99 578,68 756,43" />
-                <polyline className="trend-current" points="14,164 248,124 470,83 686,63 904,44" />
+              <svg viewBox="0 0 1000 190" preserveAspectRatio="none" role="img" aria-label={`${period} spending bar chart`}>
+                <g className="trend-bars">{chartTotals.map((amount, index) => {
+                  const x = period === "Daily"
+                    ? 14 + (index / Math.max(chartTotals.length - 1, 1)) * 890
+                    : 80 + (index / Math.max(chartTotals.length - 1, 1)) * 840;
+                  const barWidth = period === "Daily"
+                    ? Math.min(22, 890 / chartTotals.length * 0.68)
+                    : Math.min(92, 890 / chartTotals.length * 0.55);
+                  const barHeight = (amount / chartMax) * 120;
+                  return amount > 0 ? <rect key={index} x={x - barWidth / 2} y={164 - barHeight} width={barWidth} height={barHeight} rx="3"><title>{period} {index + 1}: {formatRupees(amount)}</title></rect> : null;
+                })}</g>
               </svg>
-              <div className="trend-value-labels"><span>₹12k</span><span>₹18k</span><span>₹25k</span><span>₹29.5k</span></div>
-              <span className="trend-highest">HIGHEST</span>
-              <div className="trend-week-labels">{chartValues.map((value, index) => <span key={value} className={index === 3 ? "current-week" : ""}>{period === "Weekly" ? `Week ${index + 1}` : `${index * 7 + 1} ${monthName.slice(0, 3)}`}</span>)}</div>
+              {period === "Weekly" ? <>
+                <div className="trend-value-labels">{weeklyTotals.map((amount, index) => <span key={index} style={{ left: `${getBarCenterPercent(index, weeklyTotals.length)}%` }}>{formatRupees(amount)}</span>)}</div>
+                <span className="trend-highest">HIGHEST</span>
+                <div className="trend-week-labels">{weeklyTotals.map((_, index) => <span key={index} style={{ left: `${getBarCenterPercent(index, weeklyTotals.length)}%` }}>Week {index + 1}</span>)}</div>
+              </> : <>
+                <div className="trend-value-labels trend-daily-summary">Peak {formatRupees(dailyPeak)} on {dailyPeakDay} {monthName.slice(0, 3)}</div>
+                <div className="trend-week-labels daily-ticks">{dailyTickDays.map((day) => <span key={day}>{day} {monthName.slice(0, 3)}</span>)}</div>
+              </>}
             </> : <div className="plot-empty">Add expenses to see spending trends here.</div>}
           </div>
         </section>
@@ -193,7 +200,7 @@ export function Dashboard() {
                   <strong className="dashboard-row-amount">{leaderboard === "amount" ? formatRupees(item.amount) : `${item.count} entries`}</strong>
                 </button>
               ))}
-              {highestByWho.length === 0 && <div className="dashboard-empty"><p>No expenses recorded yet.</p>{import.meta.env.DEV && <button className="dashboard-demo-button" type="button" onClick={() => { if (demoLoaded) { replaceExpenses([]); setDemoLoaded(false); } else { replaceExpenses(createDemoExpenses()); setDemoLoaded(true); } }}>{demoLoaded ? "Clear demo data" : "Load demo data"}</button>}</div>}
+              {highestByWho.length === 0 && <div className="dashboard-empty"><p>No expenses recorded yet.</p></div>}
             </div>
           </section>
 
@@ -251,7 +258,7 @@ export function Dashboard() {
               <div><strong>{missing} Bills Missing</strong><small>Action required</small></div>
             </article>
             <article className="document-status-card">
-              <CalendarDays size={20} />
+              <CircleEllipsis size={20} />
               <div><strong>{pending} To Review</strong><small>Pending verification</small></div>
             </article>
           </div>
@@ -288,6 +295,10 @@ export function Dashboard() {
           <button className="dashboard-report-button" onClick={() => downloadExpensesCsv(expenses)}><Download size={16} /> Download Full Report</button>
         </footer>
       </div>
+      <footer className="dashboard-page-footer">
+        <span>© 2026 Internal Expense. Discover. Build. Share. Innovate.</span>
+        <strong>POWERED BY DESFLYER</strong>
+      </footer>
     </div>
   );
 }
@@ -311,3 +322,32 @@ function BreakdownRow({
     </div>
   );
 }
+
+function getDailyTotals(expenses: Expense[], month: string, daysInMonth: number) {
+  const totals = Array.from({ length: daysInMonth }, () => 0);
+  expenses.forEach((expense) => {
+    if (!expense.date.startsWith(month)) return;
+    const day = Number(expense.date.slice(-2));
+    if (day >= 1 && day <= daysInMonth) totals[day - 1] += expense.amount;
+  });
+  return totals;
+}
+
+function getWeeklyTotals(expenses: Expense[], month: string, daysInMonth: number) {
+  const totals = Array.from({ length: 4 }, () => 0);
+  expenses.forEach((expense) => {
+    if (!expense.date.startsWith(month)) return;
+    const day = Number(expense.date.slice(-2));
+    const weekIndex = Math.min(Math.floor((day - 1) / 7), totals.length - 1);
+    if (day >= 1 && day <= daysInMonth) {
+      totals[weekIndex] += expense.amount;
+    }
+  });
+  return totals;
+}
+
+function getBarCenterPercent(index: number, count: number) {
+  const x = 80 + (index / Math.max(count - 1, 1)) * 840;
+  return 2 + (x / 1000) * 96;
+}
+

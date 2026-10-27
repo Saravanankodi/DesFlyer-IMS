@@ -1,6 +1,6 @@
 # DesFlyer Internal Expense
 
-A small React + TypeScript frontend for the internal expense system. The app starts with no expense records. New records are stored in memory and reset when the page is refreshed.
+A React + TypeScript expense tracker with a Python API and temporary JSON-file storage.
 
 ## Run locally
 
@@ -9,16 +9,27 @@ npm install
 npm run dev
 ```
 
-Create a production build with `npm run build`.
+This starts the web app at the Vite URL and the Python API at `http://localhost:3001`. The Vite development server proxies `/api` requests to the API. Python 3.10 or newer must be available as `python` on your PATH.
 
-## Where to make common changes
+Create a production frontend build with `npm run build`. To run only the API, use `npm run dev:api`. The API uses only Python's standard library, so no Python package installation is needed.
 
-- Initial expense records are set in `src/data/expenses.ts`.
-- Connect the app to a backend later in `src/services/expenseService.ts`.
-- Add or edit a screen in `src/pages/` and connect its URL in `src/App.tsx`.
-- Shared navigation and page layout are in `src/components/Layout.tsx`.
-- Reusable buttons, tables, badges and filters are in `src/components/Shared.tsx`.
-- Colors, spacing and responsive styles are in `src/styles.css`.
+## API
+
+- `GET /api/health` — service status
+- `GET /api/expenses` — list expenses
+- `GET /api/expenses/:id` — get an expense
+- `POST /api/expenses` — create an expense
+- `PATCH /api/expenses/:id` — update an expense
+- `DELETE /api/expenses/:id` — delete an expense
+
+Expense records are stored in `data/expenses.json`. Login users and salted password hashes are stored in `data/users.json`. The API requires a login session for expense routes. These are temporary, single-server files intended for local development; receipt files are not stored.
+
+## Demo login
+
+- Email: `admin@desflyer.com`
+- Password: `DesFlyer@2026!`
+
+The demo password is stored as a PBKDF2 hash in `data/users.json`.
 
 ## Screens
 

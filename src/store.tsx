@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -10,38 +11,56 @@ import type { Expense, ExpenseInput } from "./types";
 
 type ExpenseStore = {
   expenses: Expense[];
-  addExpense: (input: ExpenseInput) => Expense;
-  updateExpense: (id: string, updates: Partial<Expense>) => void;
-  deleteExpense: (id: string) => void;
-  replaceExpenses: (expenses: Expense[]) => void;
+  loading: boolean;
+  error: string;
+  addExpense: (input: ExpenseInput) => Promise<Expense>;
+  updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
+  replaceExpenses: (expenses: Expense[]) => Promise<void>;
 };
 
 const ExpenseContext = createContext<ExpenseStore | null>(null);
 
 export function ExpenseProvider({ children }: { children: ReactNode }) {
-  const [expenses, setExpenses] = useState(expenseService.getAll());
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    expenseService.getAll()
+      .then((records) => { if (active) setExpenses(records); })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : "Could not load expenses.");
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   const store = useMemo<ExpenseStore>(
     () => ({
       expenses,
-      addExpense: (input) => {
-        const expense = expenseService.add(input);
-        setExpenses(expenseService.getAll());
+      loading,
+      error,
+      addExpense: async (input) => {
+        const expense = await expenseService.add(input);
+        setExpenses((current) => [expense, ...current]);
         return expense;
       },
-      updateExpense: (id, updates) => {
-        expenseService.update(id, updates);
-        setExpenses(expenseService.getAll());
+      updateExpense: async (id, updates) => {
+        const updated = await expenseService.update(id, updates);
+        setExpenses((current) => current.map((expense) => expense.id === id ? updated : expense));
       },
-      deleteExpense: (id) => {
-        expenseService.remove(id);
-        setExpenses(expenseService.getAll());
+      deleteExpense: async (id) => {
+        await expenseService.remove(id);
+        setExpenses((current) => current.filter((expense) => expense.id !== id));
       },
-      replaceExpenses: (records) => {
-        expenseService.replaceAll(records);
-        setExpenses(expenseService.getAll());
+      replaceExpenses: async (records) => {
+        const saved = await expenseService.replaceAll(records);
+        setExpenses(saved);
       },
     }),
-    [expenses],
+    [expenses, loading, error],
   );
 
   return (

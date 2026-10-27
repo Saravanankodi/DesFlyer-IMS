@@ -1,25 +1,45 @@
 import { useState, type FormEvent } from "react";
 import {
   ArrowRight,
+  Eye,
+  EyeOff,
   LockKeyhole,
   Mail,
   ShieldCheck,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth";
+import { authenticate } from "../services/expenseService";
 import brandLogo from "../assets/desflyer-logo.png";
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn } = useAuth();
   const [error, setError] = useState("");
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    if (!String(data.get("email")).includes("@")) {
+    const email = String(data.get("email")).trim();
+    const password = String(data.get("password"));
+    if (!email.includes("@") || !password) {
       setError("Enter a valid work email address.");
       return;
     }
     setError("");
-    navigate("/");
+    setSubmitting(true);
+    try {
+      const result = await authenticate(email, password);
+      signIn(result.user.email, result.token, Boolean(data.get("rememberMe")));
+      const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/";
+      navigate(destination, { replace: true });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not log in.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -42,7 +62,7 @@ export function Login() {
                   required
                   name="email"
                   type="email"
-                  placeholder="name@desflyer.com"
+                  placeholder="john.doe@desflyer.com"
                   autoComplete="email"
                 />
               </div>
@@ -54,15 +74,23 @@ export function Login() {
                 <input
                   required
                   name="password"
-                  type="password"
-                  placeholder="Enter your password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
                   autoComplete="current-password"
                 />
+                <button
+                  className="password-toggle"
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </label>
             <div className="login-options">
               <label>
-                <input type="checkbox" /> Remember me
+              <input type="checkbox" name="rememberMe" /> Remember me
               </label>
               <button
                 type="button"
@@ -79,8 +107,9 @@ export function Login() {
             <button
               className="button button-primary login-submit"
               type="submit"
+              disabled={submitting}
             >
-              Log in <ArrowRight size={16} />
+              {submitting ? "Signing in…" : "Login In"} <ArrowRight size={16} />
             </button>
           </form>
           <div className="login-disclaimer">

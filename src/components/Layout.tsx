@@ -4,16 +4,18 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
-  ChevronDown,
   CircleHelp,
   FileText,
   LayoutDashboard,
+  LogOut,
   Plus,
   Search,
   Settings,
 } from "lucide-react";
 import { useExpenses } from "../store";
+import { useAuth } from "../auth";
 import { downloadExpensesCsv } from "../data/expenses";
+import { getCurrentMonthLabel } from "../data/dates";
 import brandLogo from "../assets/desflyer-logo.png";
 
 const navigation = [
@@ -29,6 +31,7 @@ export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { expenses } = useExpenses();
+  const { email, signOut } = useAuth();
   useEffect(() => {
     const syncHeaderSearch = (event: Event) =>
       setHeaderSearch((event as CustomEvent<string>).detail);
@@ -41,9 +44,10 @@ export function Layout() {
     (location.pathname.includes("/expenses/")
       ? "Expense Records"
       : "Internal Expense");
+  const isDashboardRoute = location.pathname === "/";
   const isTransactionRoute = /^\/expenses\/[^/]+(?:\/edit)?$/.test(location.pathname) && !location.pathname.endsWith("/new");
   const topbarAddAction = ["/expenses", "/analytics"].includes(location.pathname) || isTransactionRoute;
-  const showCalendar = topbarAddAction || location.pathname === "/expenses/new";
+  const showCalendar = topbarAddAction || location.pathname === "/expenses/new" || location.pathname === "/";
 
   return (
     <div className="app-shell">
@@ -59,7 +63,7 @@ export function Layout() {
             <NavLink
               key={path}
               to={path}
-              end={path === "/"}
+              end={path === "/" || path === "/expenses"}
               className={({ isActive }) =>
                 `nav-link ${isActive ? "active" : ""}`
               }
@@ -94,12 +98,12 @@ export function Layout() {
             Help / Support
           </button>
           <div className="profile">
-            <span className="avatar">AU</span>
+            <span className="avatar">{email?.slice(0, 2).toUpperCase() ?? "AU"}</span>
             <span>
-              <strong>Current User</strong>
+              <strong>{email?.split("@")[0] ?? "Current User"}</strong>
               <small>Finance Dept.</small>
             </span>
-            <ChevronDown size={15} />
+            <button className="profile-logout" aria-label="Log out" title="Log out" onClick={() => { signOut(); navigate("/login", { replace: true }); }}><LogOut size={16} /></button>
           </div>
         </div>
       </aside>
@@ -109,7 +113,7 @@ export function Layout() {
           <span className="topbar-title">{title}</span>
           <div className="topbar-actions">
             {topbarAddAction && <NavLink className="button button-primary topbar-add-expense" to="/expenses/new"><Plus size={16} /> Add Expense</NavLink>}
-            {topbarAddAction && <span className="topbar-month"><CalendarDays size={15} /> July 2026</span>}
+            {topbarAddAction && <span className="topbar-month"><CalendarDays size={15} /> {getCurrentMonthLabel()}</span>}
             {!topbarAddAction && <label className="global-search">
               <Search size={16} />
               <input
@@ -154,12 +158,12 @@ export function Layout() {
         <div className="page-area">
           <Outlet />
         </div>
-        <footer className="site-footer">
+        {!isDashboardRoute && <footer className="site-footer">
           <span>
             © 2026 Internal Expense. Discover. Build. Share. Innovate.
           </span>
           <strong>POWERED BY DESFLYER</strong>
-        </footer>
+        </footer>}
         <nav className="mobile-bottom-nav" aria-label="Main navigation">
           {navigation.map(({ label, path, icon: Icon }) => <NavLink key={path} to={path} end={path === "/"} aria-label={label} className={({ isActive }) => isActive ? "active" : ""}><Icon size={21} /></NavLink>)}
         </nav>

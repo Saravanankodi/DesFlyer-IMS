@@ -10,6 +10,8 @@ import {
   useGlobalExpenseSearch,
 } from "../components/Shared";
 import type { Expense } from "../types";
+import { MonthPicker } from "../components/MonthPicker";
+import { getCurrentMonthValue } from "../data/dates";
 
 const pageSize = 10;
 const anyPayee = "All payees";
@@ -27,6 +29,7 @@ export function ExpenseRecords() {
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue);
   const payees = [...new Set(expenses.map((item) => item.paidFor))].sort();
   const purposes = [...new Set(expenses.map((item) => item.purpose))].sort();
 
@@ -39,6 +42,7 @@ export function ExpenseRecords() {
             .includes(search.toLowerCase());
         return (
           matchesText &&
+          item.date.startsWith(selectedMonth) &&
           (paidFor === anyPayee || item.paidFor === paidFor) &&
           (purpose === anyPurpose || item.purpose === purpose) &&
           (!fromDate || item.date >= fromDate) &&
@@ -47,7 +51,7 @@ export function ExpenseRecords() {
           (!maxAmount || item.amount <= Number(maxAmount))
         );
       }),
-    [expenses, search, paidFor, purpose, fromDate, toDate, minAmount, maxAmount],
+    [expenses, search, selectedMonth, paidFor, purpose, fromDate, toDate, minAmount, maxAmount],
   );
   const sorted = [...matching].sort((a, b) => b.date.localeCompare(a.date));
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
@@ -85,7 +89,7 @@ export function ExpenseRecords() {
       <PageHeading
         title="Expense Records"
         description="Record a company expense and keep your monthly spending accurate."
-        action={<label className="records-month-picker"><CalendarDays size={18} /><span>July 2026</span><input type="month" aria-label="Select records month" defaultValue="2026-07" /></label>}
+        action={<MonthPicker className="records-month-picker" label="Select records month and year" value={selectedMonth} onChange={(value) => { setSelectedMonth(value); setPage(1); }} />}
       />
       <section className="records-filter-panel">
         <SearchField

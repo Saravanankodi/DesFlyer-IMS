@@ -89,9 +89,9 @@ export function ExpenseTable({
             <th>DATE</th>
             <th>PAID FOR</th>
             <th>PURPOSE</th>
+            <th>AMOUNT</th>
             <th>RECEIPT</th>
             <th>STATUS</th>
-            <th>AMOUNT</th>
             <th>ACTION</th>
           </tr>
         </thead>
@@ -107,6 +107,7 @@ export function ExpenseTable({
                 <span>{expense.purpose}</span>
                 <small className="table-subtext">{expense.category}</small>
               </td>
+              <td className="amount-cell">{formatRupees(expense.amount)}</td>
               <td>
                 <span
                   className={
@@ -119,7 +120,6 @@ export function ExpenseTable({
               <td>
                 <StatusBadge status={expense.status} />
               </td>
-              <td className="amount-cell">{formatRupees(expense.amount)}</td>
               <td>
                 <button className="text-button" onClick={() => onView(expense)}>
                   <Eye size={15} />

@@ -32,12 +32,12 @@ export function ExpenseDetail() {
       </section>
     );
 
-  const markReviewed = () => {
-    updateExpense(expense.id, { status: "Verified" });
+  const markReviewed = async () => {
+    await updateExpense(expense.id, { status: "Verified" });
     showToast("Expense marked as reviewed.");
   };
-  const removeExpense = () => {
-    deleteExpense(expense.id);
+  const removeExpense = async () => {
+    await deleteExpense(expense.id);
     navigate("/expenses", { state: { deleted: true } });
   };
 
@@ -53,7 +53,6 @@ export function ExpenseDetail() {
           <section className="panel detail-summary-card">
             <div className="detail-summary-heading">
               <div className="detail-id">
-              <div className="document-icon"><FileText size={22} /></div>
                 <div>
                   <span>TRANSACTION ID</span>
                   <strong>{expense.id}</strong>
@@ -75,9 +74,10 @@ export function ExpenseDetail() {
             <dl className="detail-fields">
               <div><dt>Paid For</dt><dd>{expense.paidFor}<small>{expense.paidForType}</small></dd></div>
               <div><dt>Department</dt><dd>{expense.department || "—"}</dd></div>
-              <div><dt>Category</dt><dd>{expense.category}</dd></div>
+              <div><dt>Purpose</dt><dd>{expense.purpose}</dd></div>
               <div><dt>Project</dt><dd>{expense.vendor || "—"}</dd></div>
-              <div className="detail-notes-field"><dt>Notes</dt><dd>{expense.purpose}</dd></div>
+              <div><dt>Category</dt><dd>{expense.category}</dd></div>
+              <div className="detail-notes-field"><dt>Notes</dt><dd>—</dd></div>
             </dl>
           </section>
         </div>
