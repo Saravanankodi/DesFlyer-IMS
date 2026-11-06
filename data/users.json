@@ -1,7 +1,9 @@
 [
   {
+    "name": "Admin",
     "email": "admin@desflyer.com",
-    "salt": "cde341efc3d3b694c333e967b2950c80",
-    "passwordHash": "23c717bc036d19f324cc61c7caf600841f38586bc56f881d63860e63abce7f77"
+    "role": "admin",
+    "salt": "7730837ffde2aec30f5f23b14582db6b",
+    "passwordHash": "1d76d89c2278cb33dc1a0e380f889468dc2cdeb47f4b3b97a9d62d16408acae1"
   }
 ]

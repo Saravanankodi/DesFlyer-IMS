@@ -22,7 +22,7 @@ Create a production frontend build with `npm run build`. To run only the API, us
 - `PATCH /api/expenses/:id` — update an expense
 - `DELETE /api/expenses/:id` — delete an expense
 
-Expense records are stored in `data/expenses.json`. Login users and salted password hashes are stored in `data/users.json`. The API requires a login session for expense routes. These are temporary, single-server files intended for local development; receipt files are not stored.
+Expense records and uploaded receipt data are stored in `data/expenses.json`. Login users and salted password hashes are stored in `data/users.json`. The API requires a login session for expense routes. These are temporary, single-server files intended for local development.
 
 ## Demo login
 

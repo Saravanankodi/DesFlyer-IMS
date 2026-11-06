@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, Download, Printer, X } from "lucide-react";
+import { Download, Printer, Trash2, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { downloadExpensesCsv, formatRupees } from "../data/expenses";
+import { downloadExpensesPdf, formatRupees } from "../data/expenses";
 import { useExpenses } from "../store";
 import {
   ExpenseTable,
+  FilterDropdown,
   PageHeading,
   SearchField,
   useGlobalExpenseSearch,
 } from "../components/Shared";
 import type { Expense } from "../types";
-import { MonthPicker } from "../components/MonthPicker";
+import { CalendarIcon, MonthPicker } from "../components/MonthPicker";
 import { getCurrentMonthValue } from "../data/dates";
 
 const pageSize = 10;
@@ -18,7 +19,7 @@ const anyPayee = "All payees";
 const anyPurpose = "All purposes";
 
 export function ExpenseRecords() {
-  const { expenses } = useExpenses();
+  const { expenses, deleteExpense } = useExpenses();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = useGlobalExpenseSearch(searchParams.get("search") ?? "");
@@ -29,6 +30,7 @@ export function ExpenseRecords() {
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
   const [page, setPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue);
   const payees = [...new Set(expenses.map((item) => item.paidFor))].sort();
   const purposes = [...new Set(expenses.map((item) => item.purpose))].sort();
@@ -55,10 +57,15 @@ export function ExpenseRecords() {
   );
   const sorted = [...matching].sort((a, b) => b.date.localeCompare(a.date));
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const mobilePageNumbers: (number | "ellipsis")[] = pages <= 4
+    ? Array.from({ length: pages }, (_, index) => index + 1)
+    : page <= 3
+      ? [1, 2, 3, "ellipsis", pages]
+      : [1, "ellipsis", page - 1, page, pages];
   const visible = sorted.slice((page - 1) * pageSize, page * pageSize);
   const total = matching.reduce((sum, expense) => sum + expense.amount, 0);
   const openExpense = (expense: Expense) =>
-    navigate(`/expenses/${expense.id}`);
+    navigate(`/expenses/${encodeURIComponent(expense.id)}`);
   const updateSearch = (value: string) => {
     window.dispatchEvent(new CustomEvent("expense-search", { detail: value }));
     setSearchParams(value.trim() ? { search: value } : {}, { replace: true });
@@ -89,7 +96,7 @@ export function ExpenseRecords() {
       <PageHeading
         title="Expense Records"
         description="Record a company expense and keep your monthly spending accurate."
-        action={<MonthPicker className="records-month-picker" label="Select records month and year" value={selectedMonth} onChange={(value) => { setSelectedMonth(value); setPage(1); }} />}
+        action={<MonthPicker className="records-month-picker" label="Select records month and year" value={selectedMonth} compactOnMobile onChange={(value) => { setSelectedMonth(value); setPage(1); }} />}
       />
       <section className="records-filter-panel">
         <SearchField
@@ -98,24 +105,22 @@ export function ExpenseRecords() {
           placeholder="Search by name, purpose, or expense..."
         />
         <div className="records-filter-row">
-          <label className="records-select">
-            <span className="sr-only">Filter by person or client</span>
-            <select value={paidFor} onChange={(event) => { setPaidFor(event.target.value); setPage(1); }}>
-              <option>{anyPayee}</option>
-              {payees.map((name) => <option key={name}>{name}</option>)}
-            </select>
-            <ChevronDown size={16} />
-          </label>
-          <label className="records-select">
-            <span className="sr-only">Filter by purpose</span>
-            <select value={purpose} onChange={(event) => { setPurpose(event.target.value); setPage(1); }}>
-              <option>{anyPurpose}</option>
-              {purposes.map((name) => <option key={name}>{name}</option>)}
-            </select>
-            <ChevronDown size={16} />
-          </label>
+          <FilterDropdown
+            className="records-filter-dropdown"
+            label="Paid for"
+            value={paidFor}
+            options={[anyPayee, ...payees]}
+            onChange={(value) => { setPaidFor(value); setPage(1); }}
+          />
+          <FilterDropdown
+            className="records-filter-dropdown"
+            label="Purpose"
+            value={purpose}
+            options={[anyPurpose, ...purposes]}
+            onChange={(value) => { setPurpose(value); setPage(1); }}
+          />
           <div className="records-date-range">
-            <CalendarDays size={16} />
+            <CalendarIcon className="records-calendar-icon" />
             <input aria-label="From date" type="date" value={fromDate} onChange={(event) => { setFromDate(event.target.value); setPage(1); }} />
             <span>to</span>
             <input aria-label="To date" type="date" value={toDate} onChange={(event) => { setToDate(event.target.value); setPage(1); }} />
@@ -138,17 +143,22 @@ export function ExpenseRecords() {
         </div>
       </section>
       <div className="records-summary-bar">
-        <span>Showing {matching.length} expenses <i>·</i> Total Expense: {formatRupees(total)}</span>
+        <span>Showing {matching.length} expenses <i>·</i> Total Expense: <strong className="records-total-amount">{formatRupees(total)}</strong></span>
         <div className="records-tools">
-          <button type="button" aria-label="Download filtered expenses" onClick={() => downloadExpensesCsv(matching)}><Download size={18} /></button>
+          <button type="button" aria-label="Download filtered expenses as PDF" onClick={() => downloadExpensesPdf(sorted)}><Download size={18} /></button>
           <button type="button" aria-label="Print expense records" onClick={() => window.print()}><Printer size={18} /></button>
         </div>
       </div>
       <section className="panel records-panel">
-        <ExpenseTable expenses={visible} onView={openExpense} />
+        <ExpenseTable
+          expenses={visible}
+          onView={openExpense}
+          onEdit={(expense) => navigate(`/expenses/${encodeURIComponent(expense.id)}/edit`)}
+          onDelete={setDeleteTarget}
+        />
         <div className="records-pagination">
           <span>Showing {sorted.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, sorted.length)} of {sorted.length} expenses</span>
-          <div className="records-page-buttons">
+          <div className="records-page-buttons records-page-buttons-desktop">
             <button type="button" aria-label="Previous page" disabled={page === 1} onClick={() => setPage(page - 1)}>‹</button>
             {Array.from({ length: Math.min(pages, 5) }, (_, index) => {
               const pageNumber = pages <= 5 ? index + 1 : Math.max(1, Math.min(page - 2, pages - 4)) + index;
@@ -156,8 +166,30 @@ export function ExpenseRecords() {
             })}
             <button type="button" aria-label="Next page" disabled={page === pages} onClick={() => setPage(page + 1)}>›</button>
           </div>
+          <div className="records-page-buttons records-page-buttons-mobile" aria-label="Expense record pages">
+            {mobilePageNumbers.map((pageNumber, index) => pageNumber === "ellipsis"
+              ? <span className="records-page-ellipsis" key={`ellipsis-${index}`} aria-hidden="true">…</span>
+              : <button type="button" key={pageNumber} className={page === pageNumber ? "active" : ""} aria-current={page === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}
+          </div>
         </div>
       </section>
+      {deleteTarget && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="records-delete-title">
+            <span className="delete-icon"><Trash2 size={20} /></span>
+            <h2 id="records-delete-title">Delete this expense?</h2>
+            <p>This will remove <strong>{deleteTarget.id}</strong> from the expense records.</p>
+            <div className="heading-actions">
+              <button className="button button-outline" type="button" onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button className="button button-danger" type="button" onClick={async () => {
+                await deleteExpense(deleteTarget.id);
+                setDeleteTarget(null);
+                setPage((current) => Math.min(current, Math.max(1, Math.ceil((matching.length - 1) / pageSize))));
+              }}>Delete expense</button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }

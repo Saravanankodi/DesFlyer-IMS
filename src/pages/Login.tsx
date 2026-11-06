@@ -32,7 +32,7 @@ export function Login() {
     setSubmitting(true);
     try {
       const result = await authenticate(email, password);
-      signIn(result.user.email, result.token, Boolean(data.get("rememberMe")));
+      signIn(result.user.email, result.token, result.user.role, Boolean(data.get("rememberMe")));
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/";
       navigate(destination, { replace: true });
     } catch (reason) {

@@ -8,6 +8,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { ExpenseDetail } from "./pages/ExpenseDetail";
 import { ExpenseRecords } from "./pages/ExpenseRecords";
 import { Login } from "./pages/Login";
+import { AdminSettings } from "./pages/AdminSettings";
 
 export default function App() {
   return (
@@ -18,7 +19,8 @@ export default function App() {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isReady } = useAuth();
+  if (!isReady) return <main className="page-content"><section className="panel"><p>Loading account…</p></section></main>;
   if (!isAuthenticated) {
     return (
       <Routes>
@@ -32,7 +34,7 @@ function AppRoutes() {
 
 function ExpenseRoutes() {
   const { loading, error } = useExpenses();
-  const { signOut } = useAuth();
+  const { isAdmin } = useAuth();
   if (loading) return <main className="page-content"><section className="panel"><p>Loading expenses…</p></section></main>;
   if (error) return <main className="page-content"><section className="panel"><h1>Could not connect to the expense API</h1><p>{error}</p><p>Start the app with <code>npm run dev</code> so the API server is running.</p></section></main>;
   return (
@@ -45,6 +47,7 @@ function ExpenseRoutes() {
         <Route path="/expenses/:id/edit" element={<AddExpense />} />
         <Route path="/expenses/:id" element={<ExpenseDetail />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/settings" element={isAdmin ? <AdminSettings /> : <Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

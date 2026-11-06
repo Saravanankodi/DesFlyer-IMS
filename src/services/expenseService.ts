@@ -1,8 +1,11 @@
 import type { Expense, ExpenseInput } from "../types";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
+export type UserRole = "admin" | "employee";
+export type Account = { email: string; name: string; role: UserRole };
 const token = () =>
   localStorage.getItem("desflyer-remembered-token") ??
+  localStorage.getItem("desflyer-session-token") ??
   sessionStorage.getItem("desflyer-session-token");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -30,8 +33,29 @@ export async function authenticate(email: string, password: string) {
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(body?.error ?? "Login failed.");
-  return body as { token: string; user: { email: string } };
+  return body as { token: string; user: Account };
 }
+
+export async function getCurrentUser(authToken: string) {
+  const response = await fetch(`${apiBase}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? "Could not load account.");
+  return body as { user: Account };
+}
+
+export const accountService = {
+  getAll: () => request<Account[]>("/auth/users"),
+  createEmployee: (values: { name: string; email: string; password: string }) =>
+    request<Account>("/auth/users", { method: "POST", body: JSON.stringify(values) }),
+  updateAdminPassword: (password: string) =>
+    request<Account>("/auth/password", { method: "PATCH", body: JSON.stringify({ password }) }),
+  updateEmployee: (email: string, values: { name: string; email: string; password?: string }) =>
+    request<Account>(`/auth/users/${encodeURIComponent(email)}`, { method: "PATCH", body: JSON.stringify(values) }),
+  deleteEmployee: (email: string) =>
+    request<void>(`/auth/users/${encodeURIComponent(email)}`, { method: "DELETE" }),
+};
 
 export const expenseService = {
   getAll: () => request<Expense[]>("/expenses"),

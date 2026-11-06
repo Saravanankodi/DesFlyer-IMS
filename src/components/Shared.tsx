@@ -1,12 +1,16 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
   Download,
-  Eye,
+  Link2Off,
+  MoreVertical,
+  Paperclip,
+  Pencil,
   Search,
   SlidersHorizontal,
+  Trash2,
 } from "lucide-react";
 import {
   downloadExpensesCsv,
@@ -14,6 +18,7 @@ import {
   formatRupees,
 } from "../data/expenses";
 import { useExpenses } from "../store";
+import { useAuth } from "../auth";
 import type { Expense, ExpenseStatus } from "../types";
 
 export function PageHeading({
@@ -51,6 +56,116 @@ export function StatusBadge({ status }: { status: ExpenseStatus }) {
   );
 }
 
+export function FilterDropdown({
+  label,
+  value,
+  options,
+  onChange,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const id = useId();
+  const filterRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [mobileMenuPosition, setMobileMenuPosition] = useState<{ left: number; top: number } | null>(null);
+  const [query, setQuery] = useState("");
+  const filteredOptions = options.filter((option) => option.toLowerCase().includes(query.trim().toLowerCase()));
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!filterRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        setMobileMenuPosition(null);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        setMobileMenuPosition(null);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div className={`filter-dropdown ${className}`} ref={filterRef}>
+      <button
+        type="button"
+        className="filter-dropdown-trigger"
+        role="combobox"
+        aria-label={label}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={`${id}-menu`}
+        onClick={(event) => {
+          setQuery("");
+          if (open) {
+            setOpen(false);
+            setMobileMenuPosition(null);
+            return;
+          }
+          if (window.matchMedia("(max-width: 760px)").matches) {
+            const bounds = event.currentTarget.getBoundingClientRect();
+            const width = Math.min(320, window.innerWidth - 32);
+            const height = Math.min(420, window.innerHeight - 32);
+            const left = Math.max(16, Math.min(bounds.left, window.innerWidth - width - 16));
+            const below = bounds.bottom + 6;
+            const top = below + height <= window.innerHeight - 16
+              ? below
+              : Math.max(16, bounds.top - height - 6);
+            setMobileMenuPosition({ left, top });
+          } else {
+            setMobileMenuPosition(null);
+          }
+          setOpen(true);
+        }}
+      >
+        <span>{value}</span><ChevronDown size={14} aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          className={`filter-dropdown-menu${mobileMenuPosition ? " mobile-filter-dropdown-menu" : ""}`}
+          id={`${id}-menu`}
+          style={mobileMenuPosition ?? undefined}
+          role="dialog"
+          aria-label={`${label} options`}
+        >
+          <label className="filter-dropdown-search">
+            <Search size={15} aria-hidden="true" />
+            <input type="search" aria-label={`Search ${label}`} placeholder={`Search ${label.toLowerCase()}…`} value={query} onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <div className="filter-dropdown-options" role="listbox" aria-label={`${label} options`}>
+            {filteredOptions.map((option) => (
+              <button
+                type="button"
+                role="option"
+                aria-selected={value === option}
+                className={value === option ? "selected" : ""}
+                key={option}
+                onClick={() => { onChange(option); setOpen(false); setMobileMenuPosition(null); setQuery(""); }}
+              >
+                <span>{option}</span>{value === option && <span className="filter-dropdown-check" aria-hidden="true">✓</span>}
+              </button>
+            ))}
+            {!filteredOptions.length && <p className="filter-dropdown-empty">No matching options.</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MetricCard({
   label,
   value,
@@ -77,10 +192,16 @@ export function MetricCard({
 export function ExpenseTable({
   expenses,
   onView,
+  onEdit,
+  onDelete,
 }: {
   expenses: Expense[];
   onView: (expense: Expense) => void;
+  onEdit: (expense: Expense) => void;
+  onDelete: (expense: Expense) => void;
 }) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const { isAdmin } = useAuth();
   return (
     <div className="table-wrap">
       <table>
@@ -114,6 +235,7 @@ export function ExpenseTable({
                     expense.receipt ? "receipt-attached" : "receipt-missing"
                   }
                 >
+                  {expense.receipt ? <Paperclip size={13} /> : <Link2Off size={13} />}
                   {expense.receipt ? "Attached" : "Not Added"}
                 </span>
               </td>
@@ -121,10 +243,29 @@ export function ExpenseTable({
                 <StatusBadge status={expense.status} />
               </td>
               <td>
-                <button className="text-button" onClick={() => onView(expense)}>
-                  <Eye size={15} />
-                  View
-                </button>
+                <div className="records-action-group">
+                  <button className="text-button" onClick={() => onView(expense)}>
+                    View
+                  </button>
+                  <div className="records-action-menu-wrap">
+                    <button
+                      className="records-more-button"
+                      type="button"
+                      aria-label={`Actions for ${expense.paidFor}`}
+                      aria-haspopup="menu"
+                      aria-expanded={openMenuId === expense.id}
+                      onClick={() => setOpenMenuId((current) => current === expense.id ? null : expense.id)}
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+                    {openMenuId === expense.id && (
+                      <div className="records-row-menu" role="menu">
+                        <button type="button" role="menuitem" onClick={() => { setOpenMenuId(null); onEdit(expense); }}><Pencil size={14} /> Edit</button>
+                        {isAdmin && <button type="button" role="menuitem" onClick={() => { setOpenMenuId(null); onDelete(expense); }}><Trash2 size={14} /> Delete</button>}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </td>
             </tr>
           ))}
